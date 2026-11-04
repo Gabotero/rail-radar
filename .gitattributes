@@ -1,0 +1,2 @@
+# Keep LF everywhere: the shell scripts and Dockerfile run on Linux, even when checked out on Windows.
+* text=auto eol=lf

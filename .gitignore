@@ -1,0 +1,7 @@
+node_modules/
+data/osm-rail-raw.json
+data/gtfs/
+# built deploy bundle
+deploy/railradar.tgz
+# personal helper: loads my SSH key on this PC
+deploy/unlock-ssh.sh

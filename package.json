@@ -1,0 +1,21 @@
+{
+  "name": "spain-rail-radar",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Live 3D map of Spanish trains from Renfe's own GPS feeds, with a proximity / conflict warning engine.",
+  "type": "module",
+  "scripts": {
+    "build:rail": "node scripts/build-rail.mjs",
+    "start": "node server/index.mjs",
+    "dev": "node --watch server/index.mjs"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "adm-zip": "^0.5.16",
+    "gtfs-realtime-bindings": "^1.1.1",
+    "maplibre-gl": "^5.6.0",
+    "three": "^0.170.0"
+  }
+}

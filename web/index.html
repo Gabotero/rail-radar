@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#03070e">
+  <title>Rail Radar · España</title>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/vendor/maplibre/maplibre-gl.css">
+  <link rel="stylesheet" href="/css/app.css">
+  <script type="importmap">
+    { "imports": { "three": "/vendor/three/build/three.module.js", "three/addons/": "/vendor/three/examples/jsm/" } }
+  </script>
+</head>
+<body data-cam="free">
+  <div id="map"></div>
+  <div class="vignette" aria-hidden="true"></div>
+
+  <header class="topbar glass">
+    <div class="tb-left">
+    <button id="menu-btn" class="icon-btn menu" aria-label="Toggle panel">
+      <svg viewBox="0 0 24 24" width="18" height="18"><path d="M4 7h16M4 12h16M4 17h16" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+    </button>
+    <div class="brand">
+      <svg class="logo" viewBox="0 0 32 32" aria-hidden="true">
+        <circle cx="16" cy="16" r="14" fill="none" stroke="currentColor" stroke-opacity=".35"/>
+        <circle cx="16" cy="16" r="9" fill="none" stroke="currentColor" stroke-opacity=".55"/>
+        <path d="M16 16 L16 2 A14 14 0 0 1 28.1 9 Z" fill="currentColor" fill-opacity=".35"/>
+        <circle cx="16" cy="16" r="2.2" fill="currentColor"/>
+      </svg>
+      <div class="brand-t"><b>RAIL RADAR</b><small>ESPAÑA · <span id="total">0</span> LIVE</small></div>
+    </div>
+    <div id="feeds" class="feeds"></div>
+    </div>
+    <nav class="credit" aria-label="Author">
+      <span class="credit-by">Built by</span>
+      <a href="https://www.linkedin.com/in/gabrieloteroperez/" target="_blank" rel="noopener" title="LinkedIn profile">
+        <svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><rect width="16" height="16" rx="3.2" fill="#0a66c2"/><rect x="3.1" y="6.2" width="2.3" height="6.7" fill="#fff"/><circle cx="4.25" cy="4" r="1.35" fill="#fff"/><path fill="#fff" d="M7.1 6.2h2.2v.95c.35-.62 1.12-1.12 2.22-1.12 2.1 0 2.48 1.32 2.48 3.06v3.81h-2.3V9.55c0-.82-.02-1.86-1.14-1.86-1.13 0-1.3.88-1.3 1.8v3.41H7.1z"/></svg>
+        <span class="t">gabrieloteroperez</span>
+      </a>
+      <a href="https://github.com/gabotero" target="_blank" rel="noopener" title="GitHub profile">
+        <svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path fill="#e6edf3" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
+        <span class="t">gabotero</span>
+      </a>
+    </nav>
+    <div class="tb-right">
+      <div id="alert-summary" class="alert-summary" title="Active proximity warnings"></div>
+      <div id="clock" class="clock mono">--:--:--</div>
+    </div>
+  </header>
+
+  <aside class="panel left glass" id="left">
+    <section>
+      <h3>Network</h3>
+      <div id="filters" class="filters"></div>
+      <div class="search">
+        <svg viewBox="0 0 24 24" width="15" height="15"><circle cx="11" cy="11" r="6.5" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M16 16l4 4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+        <input id="search" type="search" placeholder="Train number, line or city…" autocomplete="off" spellcheck="false">
+        <kbd>/</kbd>
+      </div>
+    </section>
+    <section class="warn-section">
+      <div class="sec-head">
+        <h3>Proximity warnings</h3>
+        <span id="warn-hidden" class="warn-hidden mono"></span>
+      </div>
+      <div id="warn-types" class="chips" role="group" aria-label="Warning types"></div>
+      <details class="how">
+        <summary>How to read these warnings</summary>
+        <div class="how-body">
+          <div class="how-gauge"><span class="c-gauge short"><i class="fill" style="width:45%"></i><i class="safe" style="left:70%"></i></span></div>
+          <p>The <b>bar</b> is the gap between the two trains. The white <b>tick</b> is the <b>safe distance</b>: how far the rear
+            train needs to stop with normal braking at its current speed, plus a 200 m margin (about 750 m at 100 km/h,
+            5.2 km at 300 km/h; head-on, both trains' braking distances). A bar that stops short of the tick means the
+            trains are too close.</p>
+          <p class="how-trend"><span id="how-trend"></span><span>The light runs faster when the gap changes faster.</span></p>
+          <p><b class="l-crit">Critical</b> closer than the rear train could stop, and still closing.
+            <b class="l-warn">Warning</b> too close now, or will be within a minute.
+            <b class="l-watch">Watch</b> will be within 3 minutes, or the data is uncertain.</p>
+          <p>Times assume both trains keep their current speed. Positions are Renfe's GPS, 15–60 s old, and there is no
+            signalling data, so this is a guide, not a safety system.</p>
+        </div>
+      </details>
+      <div id="conflicts" class="conflicts"><div class="empty">Waiting for data…</div></div>
+      <div class="engine-note">
+        <span id="engine" class="mono"></span>
+        <span>Looks 3 min ahead · safe distance = normal braking (0.7 m/s²) + 200 m</span>
+      </div>
+    </section>
+  </aside>
+
+  <aside class="panel right glass" id="train-panel" hidden>
+    <div class="tp-head">
+      <span class="tp-product">—</span>
+      <span class="tp-line" hidden></span>
+      <span class="tp-num mono">—</span>
+      <button class="icon-btn close" aria-label="Close">
+        <svg viewBox="0 0 24 24" width="16" height="16"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+      </button>
+    </div>
+    <div class="tp-route"><span class="tp-from">—</span><i></i><span class="tp-to">—</span></div>
+
+    <div class="tp-speed">
+      <div class="big mono"><span id="tp-kmh">—</span><small>km/h</small></div>
+      <div class="speedbar"><span id="tp-speedbar"></span></div>
+      <div class="tp-speed-meta"><span id="tp-speed-note"></span><span id="tp-limit" class="mono"></span></div>
+    </div>
+
+    <dl class="tp-grid">
+      <div><dt>Heading</dt><dd id="tp-heading" class="mono">—</dd></div>
+      <div><dt>Delay</dt><dd id="tp-delay" class="mono">—</dd></div>
+      <div class="wide"><dt>Status</dt><dd id="tp-status">—</dd></div>
+      <div class="wide"><dt>Track</dt><dd id="tp-track">—</dd></div>
+      <div><dt>Last GPS fix</dt><dd id="tp-age" class="mono">—</dd></div>
+      <div><dt>Shown at</dt><dd id="tp-dr" class="mono">—</dd></div>
+      <div class="wide"><dt>Position source</dt><dd id="tp-pos">—</dd></div>
+    </dl>
+    <div id="tp-warn" class="tp-warns"></div>
+
+    <div class="cam">
+      <div class="seg" role="group" aria-label="Camera">
+        <button data-cam="free">Free <kbd>1</kbd></button>
+        <button data-cam="top">Top <kbd>2</kbd></button>
+        <button data-cam="chase">Chase <kbd>3</kbd></button>
+      </div>
+      <label class="mini-toggle"><input type="checkbox" id="heading-up"><span></span>heading-up in top view</label>
+      <div id="cam-hint" class="cam-hint"></div>
+    </div>
+  </aside>
+
+  <div id="tooltip" class="tooltip glass" hidden></div>
+
+  <footer class="foot">
+    Prototype · Renfe's public GPS data is 15–60 s old and has no signalling state — <b>not a safety system</b>
+  </footer>
+
+  <script src="/vendor/maplibre/maplibre-gl.js"></script>
+  <script type="module" src="/js/main.js"></script>
+</body>
+</html>

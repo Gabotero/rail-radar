@@ -1,0 +1,19 @@
+services:
+  railradar:
+    build: .
+    container_name: railradar
+    restart: unless-stopped
+    # Localhost only: nginx publishes it at https://trainspain.duckdns.org (deploy/setup-nginx.sh).
+    ports:
+      - "127.0.0.1:8610:8610"
+    environment:
+      TZ: Europe/Madrid
+    volumes:
+      - gtfs-cache:/app/data/gtfs
+    mem_limit: 768m
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "3" }
+
+volumes:
+  gtfs-cache:
