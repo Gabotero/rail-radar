@@ -3,7 +3,7 @@
 import { CAT_COLORS, CAT_LABELS, LEVEL_LABEL } from './theme.js';
 
 const $ = (sel, root = document) => root.querySelector(sel);
-const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+export const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const COMPASS = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
 const WARN_CHIPS = {
   following: ['Closing', 'A train closing on the one ahead on the same line'],
@@ -82,11 +82,9 @@ export class UI {
     store.addEventListener('focus', () => this._conflicts());
     const list = $('#conflicts');
     list.addEventListener('pointerdown', () => { this._listHeld = true; });
-    window.addEventListener('pointerup', () => {
-      if (!this._listHeld) return;
-      this._listHeld = false;
-      if (this._listDirty) { this._listDirty = false; setTimeout(() => this._conflicts(), 0); }
-    });
+    const release = () => { if (this._listHeld) this.holdList(false); };
+    window.addEventListener('pointerup', release);
+    window.addEventListener('pointercancel', release); // a touch that turns into a scroll ends this way
     list.addEventListener('click', (e) => {
       const b = e.target.closest('.conflict');
       if (!b) return;
@@ -100,6 +98,12 @@ export class UI {
     rig.addEventListener('mode', () => this._camButtons());
     setInterval(() => { this._clock(); this._updateTrainPanel(); }, 250);
     $('#menu-btn').addEventListener('click', () => document.body.classList.toggle('show-left'));
+  }
+
+  /** Stops redrawing the warnings list while it is being touched or scrolled; catches up on release. */
+  holdList(on) {
+    this._listHeld = on;
+    if (!on && this._listDirty) { this._listDirty = false; setTimeout(() => this._conflicts(), 0); }
   }
 
   // ---------- top bar ----------
@@ -270,11 +274,15 @@ picked up ${f.pickupDelay != null ? f.pickupDelay.toFixed(1) : '?'} s after publ
 
   _camButtons() {
     document.querySelectorAll('[data-cam]').forEach((b) => b.classList.toggle('on', b.dataset.cam === this.rig.mode));
-    $('#cam-hint').textContent = {
+    $('#cam-hint').textContent = (window.matchMedia('(pointer: coarse)').matches ? {
+      free: 'Pan & pinch freely · tap a train to select it',
+      top: 'Following from above · pinch to zoom · drag to release',
+      chase: 'Chase view · pinch = distance · drag = orbit / height',
+    } : {
       free: 'Pan & zoom freely · click a train to select it',
       top: 'Following from above · wheel to zoom · drag to release',
       chase: 'Chase view · wheel = distance · drag = orbit / height',
-    }[this.rig.mode];
+    })[this.rig.mode];
     document.body.dataset.cam = this.rig.mode;
   }
 

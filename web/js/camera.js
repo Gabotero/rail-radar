@@ -1,5 +1,5 @@
 // Follow camera: "top" (overhead, follows the train) and "chase" (third person behind the train).
-// In follow modes MapLibre's own gestures are disabled and replaced: wheel = distance,
+// In follow modes MapLibre's own gestures are disabled and replaced: wheel or pinch = distance,
 // drag = orbit around the train (chase) — or release back to free mode (top).
 
 import { offset } from '/shared/geo.mjs';
@@ -41,6 +41,8 @@ export class CameraRig extends EventTarget {
     const h = this.map;
     const handlers = [h.dragPan, h.dragRotate, h.scrollZoom, h.touchZoomRotate, h.doubleClickZoom, h.keyboard, h.touchPitch];
     for (const x of handlers) mode === 'free' ? x.enable() : x.disable();
+    // touch gestures come here in follow modes: otherwise the browser takes them to zoom or scroll the page
+    this.map.getCanvasContainer().style.touchAction = mode === 'free' ? '' : 'none';
     this.dispatchEvent(new Event('mode'));
   }
 
@@ -93,14 +95,37 @@ export class CameraRig extends EventTarget {
     }, { passive: false });
 
     let drag = null;
+    const touches = new Map(); // fingers on the map, for pinching
+    let pinch = 0;             // distance between two fingers at the last move
+    const spread = () => { const [a, b] = touches.values(); return Math.hypot(a.x - b.x, a.y - b.y); };
     el.addEventListener('pointerdown', (e) => {
       if (this.mode === 'free') return;
-      drag = { x: e.clientX, y: e.clientY, moved: false };
+      if (e.pointerType === 'touch') {
+        touches.set(e.pointerId, { x: e.clientX, y: e.clientY });
+        if (touches.size === 2) { drag = null; pinch = spread(); return; }
+      }
+      drag = { x: e.clientX, y: e.clientY, moved: false, travel: 0, touch: e.pointerType === 'touch' };
     });
     window.addEventListener('pointermove', (e) => {
-      if (!drag || this.mode === 'free') return;
+      if (this.mode === 'free') return;
+      if (touches.has(e.pointerId)) {
+        touches.set(e.pointerId, { x: e.clientX, y: e.clientY });
+        if (touches.size === 2) {
+          const d = spread();
+          if (pinch > 0 && d > 0) {
+            const f = pinch / d;
+            if (this.mode === 'chase') { this.dist = clamp(this.dist * f, 25, 8000); this.alt = clamp(this.alt * f, 4, 4000); }
+            else this.topZoom = clamp(this.topZoom - Math.log2(f), 7, 19.5);
+          }
+          pinch = d;
+          return;
+        }
+      }
+      if (!drag) return;
       const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
-      if (Math.abs(dx) + Math.abs(dy) > 3) drag.moved = true;
+      drag.travel += Math.abs(dx) + Math.abs(dy);
+      // a finger always wobbles a little, so a tap is only a drag after it has really travelled
+      if (drag.touch ? drag.travel > 10 : Math.abs(dx) + Math.abs(dy) > 3) drag.moved = true;
       drag.x = e.clientX; drag.y = e.clientY;
       if (this.mode === 'chase') {
         this.yaw = (this.yaw - dx * 0.3 + 360) % 360;
@@ -110,6 +135,13 @@ export class CameraRig extends EventTarget {
         drag = null;
       }
     });
-    window.addEventListener('pointerup', () => { if (drag) this.lastDragMoved = drag.moved; drag = null; });
+    const end = (e) => {
+      touches.delete(e.pointerId);
+      if (touches.size < 2) pinch = 0;
+      if (drag) this.lastDragMoved = drag.moved;
+      drag = null;
+    };
+    window.addEventListener('pointerup', end);
+    window.addEventListener('pointercancel', end);
   }
 }

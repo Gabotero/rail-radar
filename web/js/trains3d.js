@@ -42,6 +42,8 @@ export class TrainsLayer {
     this.store = store;
     this.models = buildTrainModels();
     this.scaleOf = new Map(); // id -> current visual scale (used for picking)
+    this.sizeK = null;        // zoom -> factor on the minimum on-screen sizes (set on phones: little room)
+    this.repaintMs = 0;       // wait between frames when nothing else asks for one (set on phones: battery)
   }
 
   onAdd(map, gl) {
@@ -126,7 +128,8 @@ export class TrainsLayer {
     const glowK = zoom < 12 ? 1 : Math.max(0.15, 1 - (zoom - 12) / 4);
     const flagged = store.conflictLevelByTrain;
     const focus = store.focus;
-    const wPx = minWidthPx(zoom), fwPx = focusWidthPx(zoom);
+    const k = this.sizeK ? this.sizeK(zoom) : 1;
+    const wPx = minWidthPx(zoom) * k, fwPx = focusWidthPx(zoom) * k;
 
     for (const tr of store.trains.values()) {
       if (!tr.disp || !store.isVisible(tr)) continue;
@@ -142,7 +145,7 @@ export class TrainsLayer {
       const mpp = (40075016.686 * cosL) / (512 * 2 ** zoom);
       const focused = !!focus && (focus.a === tr.id || focus.b === tr.id);
       const dim = !!focus && !focused;
-      const s = Math.max(1, ((focused ? FOCUS_MIN_PX : MIN_PX) * mpp) / model.length);   // along the train
+      const s = Math.max(1, ((focused ? FOCUS_MIN_PX : MIN_PX) * k * mpp) / model.length); // along the train
       const sw = Math.max(s, ((focused ? fwPx : wPx) * mpp) / model.width);              // across it
       this.scaleOf.set(tr.id, s);
 
@@ -171,8 +174,8 @@ export class TrainsLayer {
       // Glow: a soft streak in the category colour along the train, wider than the body so it
       // shows around it. Fades when close. Watch/warning trains glow in the level colour instead.
       if (g < MAX) {
-        const gl = (model.length * s + 14 * mpp) * 1.35 * latF;
-        const gw = (model.width * sw * 3.2 + 12 * mpp) * latF;
+        const gl = (model.length * s + 14 * k * mpp) * 1.35 * latF;
+        const gw = (model.width * sw * 3.2 + 12 * k * mpp) * latF;
         this._p.set(x, y, 0.15);
         this._s.set(gl, gw, 1);
         this._m.compose(this._p, this._q, this._s);
@@ -223,7 +226,10 @@ export class TrainsLayer {
 
     this.renderer.resetState();
     this.renderer.render(this.scene, this.camera);
-    map.triggerRepaint();
+    if (this.repaintMs) {
+      clearTimeout(this._repaint);
+      this._repaint = setTimeout(() => map.triggerRepaint(), this.repaintMs);
+    } else map.triggerRepaint();
   }
 
   /** Visual length in metres of a train right now (for picking & camera distance). */

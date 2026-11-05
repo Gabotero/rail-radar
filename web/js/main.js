@@ -3,23 +3,26 @@ import { Store } from './store.js';
 import { TrainsLayer } from './trains3d.js';
 import { CameraRig } from './camera.js';
 import { UI, accentOf, trainName, fmtDist, isStopped, trendText } from './ui.js';
+import { PhoneUI, PHONE_QUERY } from './phone.js';
 import { offset } from '/shared/geo.mjs';
 
 const maplibregl = window.maplibregl;
 const store = new Store();
+const phoneScreen = window.matchMedia(PHONE_QUERY);
+const COMPUTER_LIMITS = { minZoom: 4.5, maxBounds: [[-14.5, 33.0], [9.5, 46.8]] };
 
 const map = new maplibregl.Map({
   container: 'map',
   style: buildStyle(),
   center: [-3.6, 40.2],
   zoom: window.innerWidth < 700 ? 4.9 : 5.75,
-  minZoom: 4.5,
+  ...COMPUTER_LIMITS,
   maxZoom: 19.5,
   maxPitch: 85,
-  maxBounds: [[-14.5, 33.0], [9.5, 46.8]],
   attributionControl: false,
   canvasContextAttributes: { antialias: true },
   fadeDuration: 120,
+  ...(phoneScreen.matches ? { pixelRatio: Math.min(window.devicePixelRatio, 2) } : {}), // sharp enough, and easier on the battery
 });
 map.addControl(new maplibregl.AttributionControl({
   compact: true,
@@ -40,7 +43,7 @@ const topbar = document.querySelector('.topbar');
 const attrib = document.querySelector('.maplibregl-ctrl-attrib');
 const phone = window.matchMedia('(max-width: 860px)');
 function placeCredit() {
-  if (!credit || !attrib) return;
+  if (!credit || !attrib || phoneScreen.matches) return; // on phones the links are in the About tab
   credit.style.left = '';
   credit.style.bottom = '';
   credit.style.visibility = '';
@@ -84,7 +87,8 @@ placeCredit();
 const layer = new TrainsLayer(store);
 const rig = new CameraRig(map, store, layer);
 const ui = new UI({ map, store, rig, layer, onFocusConflict: focusConflict });
-window.__radar = { map, store, rig, layer }; // handy for debugging in the console
+const phoneUI = new PhoneUI({ map, store, rig, layer, ui, computer: COMPUTER_LIMITS, onDisable: placeCredit });
+window.__radar = { map, store, rig, layer, phoneUI }; // handy for debugging in the console
 
 map.on('load', () => {
   map.addLayer(layer, 'station');
@@ -134,12 +138,13 @@ function pick(point, tol = 14) {
 
 map.on('click', (e) => {
   if (rig.lastDragMoved) { rig.lastDragMoved = false; return; }
-  const t = pick(e.point);
+  const t = pick(e.point, phoneUI.active ? 26 : 14); // a finger needs more room than a mouse
   if (t) {
     const was = store.selectedId;
     store.select(t.id);
     if (rig.mode === 'free' && was !== t.id) rig.setMode('top');
   } else if (rig.mode === 'free') store.select(null);
+  phoneUI.mapTapped(t);
 });
 
 let hoverPending = false;
@@ -322,7 +327,7 @@ function placeGapTag(g, A, B, mid) {
     if (Math.abs(ox) < 500 && Math.abs(oy) < 400) others.push([ox, oy]);
   }
   const host = map.getContainer().getBoundingClientRect();
-  const blocks = ['.topbar', '#left', '#train-panel'].map((s) => document.querySelector(s))
+  const blocks = ['.topbar', '#left', '#train-panel', '.ph-dock'].map((s) => document.querySelector(s))
     .filter((e) => e && !e.hidden && e.offsetParent !== null)
     .map((e) => { const r = e.getBoundingClientRect(); return [r.left - host.left - pm.x, r.top - host.top - pm.y, r.right - host.left - pm.x, r.bottom - host.top - pm.y]; });
   const view = [-pm.x + 8, -pm.y + 8, host.width - pm.x - 8, host.height - pm.y - 8];
@@ -363,5 +368,5 @@ function focusConflict(c) {
   const a = store.trains.get(c.a)?.disp, b = store.trains.get(c.b)?.disp;
   const pa = a ? [a.lon, a.lat] : c.aPos, pb = b ? [b.lon, b.lat] : c.bPos;
   map.fitBounds([[Math.min(pa[0], pb[0]), Math.min(pa[1], pb[1])], [Math.max(pa[0], pb[0]), Math.max(pa[1], pb[1])]],
-    { padding: { top: 140, bottom: 140, left: 380, right: 400 }, maxZoom: 15.5, duration: 1400, pitch: 45 });
+    { padding: phoneUI.active ? phoneUI.fitPadding() : { top: 140, bottom: 140, left: 380, right: 400 }, maxZoom: 15.5, duration: 1400, pitch: 45 });
 }

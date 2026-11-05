@@ -28,7 +28,15 @@ export class Store extends EventTarget {
   }
 
   connect() {
-    const es = new EventSource('/api/stream');
+    if (!this._resume) {
+      // a phone drops the stream while the page is in the background: pick it up again on return
+      this._resume = () => {
+        if (document.visibilityState === 'visible' && this.es && (this.es.readyState === EventSource.CLOSED || performance.now() - this.lastMsgAt > 15000)) this.connect();
+      };
+      document.addEventListener('visibilitychange', this._resume);
+    }
+    this.es?.close();
+    const es = this.es = new EventSource('/api/stream');
     const on = (name, fn) => es.addEventListener(name, (e) => { this.lastMsgAt = performance.now(); fn(JSON.parse(e.data)); });
     es.onopen = () => { this.connected = true; this.emit('connection'); };
     es.onerror = () => { this.connected = false; this.emit('connection'); };

@@ -73,6 +73,10 @@ The prebuilt rail network is included in this repository. Static GTFS is downloa
 Controls: click a train → **Top** (follow from above) / **Chase** (third person). In chase view, wheel = distance,
 drag = orbit / height. Keys: `1` free, `2` top, `3` chase, `Esc` release, `/` search.
 
+On a phone the page uses its own layout: a full-screen map, tabs for Notices, Network and About, and panels you
+can drag. Tapping a notice zooms to that pair of trains. When following a train, pinch = distance or zoom; drag =
+orbit in chase view, or release back to the free map in top view.
+
 ## Deploy (live at https://trainspain.duckdns.org)
 
 The app runs in `~/railradar` on the server as the Docker container `railradar`, listening on
