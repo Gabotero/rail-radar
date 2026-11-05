@@ -50,6 +50,8 @@ Renfe GTFS-RT ──(conditional GET every 2 s)──▶ feeds.mjs ──▶ tra
   - *opposing*: on the same track, heading towards each other, and no second track (double track or passing
     loop) between them.
   - *converging*: paths cross at an angle within the horizon.
+  - *opposing* and *converging* pairs stay at the lowest level (watch): public data cannot show which track a
+    train is on, so neither can be confirmed.
   - Confidence is downgraded for old fixes, station-coordinate positions, unsnapped trains and multi-track
     sections. Duplicates and coupled units are suppressed.
 

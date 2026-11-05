@@ -6,12 +6,12 @@ const $ = (sel, root = document) => root.querySelector(sel);
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const COMPASS = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
 const WARN_CHIPS = {
-  following: ['Closing', 'A train closing on the one ahead on the same track'],
-  opposing: ['Head-on', 'Trains heading towards each other on single track'],
+  following: ['Closing', 'A train closing on the one ahead on the same line'],
+  opposing: ['Opposing', 'Trains heading towards each other where the map shows one track'],
   converging: ['Converging', 'Paths that cross at a junction'],
   passing: ['Crossings', 'Normal crossings where there is a second track (info only)'],
 };
-const SHORT_TYPE = { following: 'Same track', opposing: 'Head-on', converging: 'Converging', passing: 'Crossing' };
+const SHORT_TYPE = { following: 'Same line', opposing: 'Opposing', converging: 'Converging', passing: 'Crossing' };
 // The engine's notes, in words a viewer understands.
 function plainNote(n) {
   return n
@@ -20,7 +20,7 @@ function plainNote(n) {
     .replace(/^position = station coordinates, not GPS$/, 'one position is just the station, not GPS')
     .replace(/^not snapped to track$/, 'one train is off the mapped track')
     .replace(/^(.+): speed not yet measured \(single fix\), assumed stopped$/, '$1: speed not measured yet, assumed stopped')
-    .replace(/^separation below braking distance but opening$/, 'too close, but already pulling apart')
+    .replace(/^separation below braking distance but opening$/, 'close, but already pulling apart')
     .replace(/^approaching an occupied station$/, 'approaching a station where the other train is stopped')
     .replace(/^paths cross: junction or grade-separated crossing$/, 'may be a junction, or a bridge where the lines do not meet')
     // already said by the headline
@@ -201,7 +201,7 @@ picked up ${f.pickupDelay != null ? f.pickupDelay.toFixed(1) : '?'} s after publ
     $('#engine').textContent = engine ? `${engine.trains} trains · ${engine.pairs} pairs · ${engine.ms} ms` : '';
     const el = $('#conflicts');
     if (!list.length) {
-      el.innerHTML = `<div class="empty">${store.conflicts.length ? 'No warnings for the selected networks and types.' : 'No proximity warnings right now.'}</div>`;
+      el.innerHTML = `<div class="empty">${store.conflicts.length ? 'No notices for the selected networks and types.' : 'No proximity notices right now.'}</div>`;
       return;
     }
     el.innerHTML = list.slice(0, 60).map((c) => this._card(c, f)).join('');
@@ -214,19 +214,19 @@ picked up ${f.pickupDelay != null ? f.pickupDelay.toFixed(1) : '?'} s after publ
     const st = (d) => (isStopped(d) && c.level !== 'info' ? ' <span class="c-stop">■ stopped</span>' : '');
     const closing = c.closing ?? 0;
     let head;
-    if (c.type === 'following') head = closing > 0.3 ? `${na} is catching up with ${nb}${st(B)}` : `${na} is too close behind ${nb}${st(B)}`;
-    else if (c.type === 'opposing') head = `${na}${st(A)} and ${nb}${st(B)} are heading towards each other on single track`;
+    if (c.type === 'following') head = closing > 0.3 ? `${na} is catching up with ${nb}${st(B)}` : `${na} is close behind ${nb}${st(B)}`;
+    else if (c.type === 'opposing') head = `${na}${st(A)} and ${nb}${st(B)} are heading towards each other where the map shows one track`;
     else if (c.type === 'converging') head = `${na} and ${nb} are heading for the same junction`;
     else head = `${na} and ${nb} will pass each other on double track`;
 
-    // gap vs safe distance, as a bar: the fill is the gap, the tick is the safe distance
+    // gap vs margin, as a bar: the fill is the gap, the tick is the margin
     let gauge = '';
     if ((c.type === 'following' || c.type === 'opposing') && c.req) {
       const max = Math.max(c.gap, c.req) * 1.15;
       const short = c.gap < c.req;
       gauge = `
         <span class="c-gauge ${short ? 'short' : ''}"><i class="fill" style="width:${(100 * c.gap / max).toFixed(1)}%"></i><i class="safe" style="left:${(100 * c.req / max).toFixed(1)}%"></i></span>
-        <span class="c-scale"><span><b>${fmtDist(c.gap)}</b> apart</span><span>safe distance <b>${fmtDist(c.req)}</b></span></span>`;
+        <span class="c-scale"><span><b>${fmtDist(c.gap)}</b> apart</span><span>margin <b>${fmtDist(c.req)}</b></span></span>`;
     }
 
     const facts = [];
@@ -234,11 +234,11 @@ picked up ${f.pickupDelay != null ? f.pickupDelay.toFixed(1) : '?'} s after publ
     if (c.resolved) facts.push('no longer reported');
     else if (c.type === 'passing') facts.push(`they pass in ${c.ttb} s`);
     else if (c.type === 'converging') facts.push(`both within ${c.req} m of each other in ${c.ttb} s`);
-    else if (c.level === 'critical') facts.push('<span class="hot">closer than the rear train can stop</span>');
-    else if (c.ttb <= 0) facts.push('<span class="hot">closer than the safe distance now</span>');
-    else facts.push(`closer than the safe distance in <b>${c.ttb} s</b> at current speeds`);
+    else if (c.level === 'critical') facts.push('<span class="hot">inside the estimated braking distance</span>');
+    else if (c.ttb <= 0) facts.push(c.type === 'following' ? '<span class="hot">closer than the margin now</span>' : 'closer than the margin now');
+    else facts.push(`closer than the margin in <b>${c.ttb} s</b> at current speeds`);
 
-    const when = c.resolved ? 'resolved' : c.ttb <= 0 && c.level !== 'info' ? 'NOW' : `in ${c.ttb} s`;
+    const when = c.resolved ? 'resolved' : c.ttb <= 0 && c.level !== 'info' ? 'now' : `in ${c.ttb} s`;
     const focused = !!f && c.key === f.key;
     const notes = (c.notes || []).map(plainNote).filter(Boolean);
     return `<button class="conflict ${c.level} ${c.fading ? 'fading' : ''} ${focused ? 'focused' : ''} ${c.resolved ? 'resolved' : ''}" data-key="${esc(c.key)}" title="${focused ? 'Shown on the map. Click again to clear' : 'Show these two trains on the map'}">
@@ -323,9 +323,9 @@ picked up ${f.pickupDelay != null ? f.pickupDelay.toFixed(1) : '?'} s after publ
       const other = this.store.trains.get(c.a === d.id ? c.b : c.a)?.d;
       const o = esc(trainName(other));
       const gaining = (c.closing ?? 0) > 0.3;
-      const what = c.type === 'following' ? (c.a === d.id ? (gaining ? `Catching up with ${o}` : `Too close behind ${o}`) : (gaining ? `${o} is catching up from behind` : `${o} is too close behind`))
-        : c.type === 'opposing' ? `Heading towards ${o} on single track` : `Path meets ${o}'s at a junction`;
-      const dist = c.type === 'converging' ? '' : ` · ${fmtDist(c.gap)} apart (safe: ${fmtDist(c.req)})`;
+      const what = c.type === 'following' ? (c.a === d.id ? (gaining ? `Catching up with ${o}` : `Close behind ${o}`) : (gaining ? `${o} is catching up from behind` : `${o} is close behind`))
+        : c.type === 'opposing' ? `Heading towards ${o} where the map shows one track` : `Path meets ${o}'s at a junction`;
+      const dist = c.type === 'converging' ? '' : ` · ${fmtDist(c.gap)} apart (margin: ${fmtDist(c.req)})`;
       return `<div class="tp-w ${c.level}"><b>${LEVEL_LABEL[c.level]}</b> ${what}${dist} · ${c.ttb <= 0 ? 'now' : `in ${c.ttb} s`}</div>`;
     }).join('') : '';
   }

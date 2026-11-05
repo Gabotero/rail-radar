@@ -245,7 +245,7 @@ function updateGapTag(f, A, B) {
   if (c !== g.c) { g.el.style.setProperty('--c', c); g.c = c; }
   const l1 = !store.focusLive ? 'resolved'
     : f.type === 'converging' ? `paths cross in ${f.ttb} s`
-    : `${f.req && f.gap < f.req ? 'TOO CLOSE · ' : ''}${fmtDist(f.gap)} apart${f.req ? ` <small>(safe ${fmtDist(f.req)})</small>` : ''}`;
+    : `${f.type === 'following' && f.req && f.gap < f.req ? 'Close · ' : ''}${fmtDist(f.gap)} apart${f.req ? ` <small>(margin ${fmtDist(f.req)})</small>` : ''}`;
   const cl = f.closing ?? 0;
   const k2 = !store.focusLive || f.type === 'converging' ? '' : `${cl > 0.3 ? 1 : cl < -0.3 ? -1 : 0}:${Math.round(Math.abs(cl) * 3.6)}`;
   let changed = false;

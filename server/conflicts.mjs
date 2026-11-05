@@ -33,10 +33,12 @@ export const RULES = {
 };
 
 // Levels:
-//   critical  the follower (or both opposing trains) could not stop within the current gap
-//             even braking now, and the gap is closing
+//   critical  the follower could not stop within the current gap even braking now, and the gap
+//             is closing
 //   warning   separation is, or within WARN_S will be, below braking distance + margin
-//   watch     same, but further out in the horizon — or low-confidence data
+//   watch     same, but further out in the horizon — or low-confidence data. Opposing and converging
+//             pairs never go above this: public data cannot show which track a train is on, so
+//             neither can be confirmed.
 //   info      normal crossing on double track / passing loop
 const LEVEL_RANK = { critical: 0, warning: 1, watch: 2, info: 3 };
 const DOWNGRADE = { critical: 'warning', warning: 'watch', watch: 'watch', info: 'info' };
@@ -100,7 +102,7 @@ export class ConflictEngine {
           if (a.tr.posSrc === 'station' || b.tr.posSrc === 'station') { c.level = DOWNGRADE[c.level]; c.notes.push('position = station coordinates, not GPS'); }
           if (!a.tr.snap || !b.tr.snap) { c.level = DOWNGRADE[c.level]; c.notes.push('not snapped to track'); }
           for (const s of [a, b]) if (s.tr.speed == null) c.notes.push(`${s.tr.info?.num || s.tr.vid}: speed not yet measured (single fix), assumed stopped`);
-          c.confidence = c.notes.some((n) => /old|station|snapped|not yet measured/.test(n)) ? 'low' : 'normal';
+          c.confidence = c.notes.some((n) => /old|station|snapped|not yet measured|missing a second track/.test(n)) ? 'low' : 'normal';
           const prev = found.get(c.key);
           if (!prev || LEVEL_RANK[c.level] < LEVEL_RANK[prev.level]) found.set(c.key, c);
         }
@@ -220,8 +222,8 @@ export class ConflictEngine {
     const ttb = Math.max(0, (gap - req) / closing);
     if (ttb > RULES.HORIZON_S) return null;
     return this._base('opposing', x, y, {
-      level: severity(gap, bd, ttb, closing), ttb: Math.round(ttb), gap: Math.round(gap), req: Math.round(req),
-      closing: Math.round(closing * 10) / 10, tracks: 1, notes: ['single track between trains'], point: [mp[0], mp[1]],
+      level: 'watch', ttb: Math.round(ttb), gap: Math.round(gap), req: Math.round(req),
+      closing: Math.round(closing * 10) / 10, tracks: 1, notes: ['single track between trains', 'the map may be missing a second track'], point: [mp[0], mp[1]],
     });
   }
 
@@ -234,7 +236,7 @@ export class ConflictEngine {
         const ang = angleDiff(pa[2], pb[2]);
         if (ang < 15 || ang > 165) return null; // side by side on parallel tracks
         return this._base('converging', a, b, {
-          level: t <= 30 ? 'warning' : 'watch', ttb: t, gap: Math.round(d0), req: RULES.CONVERGE_M,
+          level: 'watch', ttb: t, gap: Math.round(d0), req: RULES.CONVERGE_M,
           closing: null, tracks: null, notes: ['paths cross: junction or grade-separated crossing'],
           point: [(pa[0] + pb[0]) / 2, (pa[1] + pb[1]) / 2],
         });
